@@ -9,13 +9,13 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/weave-lab/grpc-demo/grpcdemoproto"
+	"github.com/weave-lab/grpc-demo/proto"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
 type Client struct {
-	service grpcdemoproto.GuestBookServiceClient
+	service proto.GuestBookServiceClient
 }
 
 // NewClient connects to the guestbook service and returns a client
@@ -34,7 +34,7 @@ func NewClient(addr string) (*Client, error) {
 
 	// get the service client
 	c := Client{
-		service: grpcdemoproto.NewGuestBookServiceClient(g),
+		service: proto.NewGuestBookServiceClient(g),
 	}
 
 	return &c, err
@@ -115,7 +115,7 @@ func (c *Client) Create() error {
 
 func (c *Client) create(ctx context.Context, name, message string) error {
 
-	in := grpcdemoproto.GuestBookEntry{
+	in := proto.GuestBookEntry{
 		Name:    name,
 		Message: message,
 	}

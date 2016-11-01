@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/weave-lab/grpc-demo/grpcdemoproto"
+	"github.com/weave-lab/grpc-demo/proto"
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 	server := grpc.NewServer(grpc.UnaryInterceptor(UnaryLogging))
 
 	// Register our GuestBookService implementation with the server
-	grpcdemoproto.RegisterGuestBookServiceServer(server, NewGuestBookService())
+	proto.RegisterGuestBookServiceServer(server, NewGuestBookService())
 
 	fmt.Println("Serving on", listener.Addr().String())
 	server.Serve(listener)
@@ -34,11 +35,15 @@ func main() {
 
 //GuestBookService implements the gRPC service defined in the proto file
 type GuestBookService struct {
-	guestBookEntries []*grpcdemoproto.GuestBookEntry
+	guestBookEntries []*proto.GuestBookEntry
 }
 
 //Create adds a new entry to the guestbook
-func (svc *GuestBookService) Create(ctx context.Context, entry *grpcdemoproto.GuestBookEntry) (*empty.Empty, error) {
+func (svc *GuestBookService) Create(ctx context.Context, entry *proto.GuestBookEntry) (*empty.Empty, error) {
+	if entry.Name == "" || entry.Message == "" {
+		return nil, errors.New("Must provide both a Name and a Message")
+	}
+
 	now, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
 		return nil, err
@@ -51,8 +56,8 @@ func (svc *GuestBookService) Create(ctx context.Context, entry *grpcdemoproto.Gu
 }
 
 //List lists all current entries in the guestbook
-func (svc *GuestBookService) List(ctx context.Context, _ *empty.Empty) (*grpcdemoproto.ListGuestBookResponse, error) {
-	return &grpcdemoproto.ListGuestBookResponse{
+func (svc *GuestBookService) List(ctx context.Context, _ *empty.Empty) (*proto.ListGuestBookResponse, error) {
+	return &proto.ListGuestBookResponse{
 		Entries: svc.guestBookEntries,
 	}, nil
 }
@@ -65,13 +70,13 @@ func NewGuestBookService() *GuestBookService {
 	}
 
 	return &GuestBookService{
-		guestBookEntries: []*grpcdemoproto.GuestBookEntry{
-			&grpcdemoproto.GuestBookEntry{
+		guestBookEntries: []*proto.GuestBookEntry{
+			&proto.GuestBookEntry{
 				Name:    "Robison Rogers",
 				Message: "Dammit Clint.",
 				Time:    now,
 			},
-			&grpcdemoproto.GuestBookEntry{
+			&proto.GuestBookEntry{
 				Name:    "Colton Shields",
 				Message: "I like to leave early on Fridays... If I come in at all.",
 				Time:    now,
@@ -82,11 +87,11 @@ func NewGuestBookService() *GuestBookService {
 
 //UnaryLogging is a gRPC interceptor for logging simple messages when requests are received
 func UnaryLogging(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	fmt.Printf("Received gRPC Request for method [%s] at [%s]\n", info.FullMethod, time.Now())
+	fmt.Printf("[%s]: gRPC Request Method [%s]\n", time.Now(), info.FullMethod)
 
 	resp, err = handler(ctx, req)
 
-	fmt.Printf("Finished handling gRPC request at [%s]\n", time.Now())
+	fmt.Printf("[%s]: gRPC Response code [%s]\n\n", time.Now(), grpc.Code(err))
 
 	return resp, err
 }

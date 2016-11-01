@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package grpcdemoproto;
-option go_package = "github.com/weave-lab/grpc-demo/grpcdemoproto";
+option go_package = "github.com/weave-lab/grpc-demo/proto";
 import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 import "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto";
 
