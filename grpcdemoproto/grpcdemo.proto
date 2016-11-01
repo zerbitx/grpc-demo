@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package grpcdemoproto;
+option go_package = "github.com/weave-lab/grpc-demo/grpcdemoproto";
+import "github.com/golang/protobuf/ptypes/empty/empty.proto";
+import "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto";
+
+message GuestBookEntry {
+  string Name = 1;
+  string Message = 2;
+  google.protobuf.Timestamp Time = 3;
+}
+
+message ListGuestBookResponse {
+  repeated GuestBookEntry Entries = 1;
+}
+
+
+service GuestBookService {
+  rpc Create (GuestBookEntry) returns (google.protobuf.Empty) {}
+  rpc List (google.protobuf.Empty) returns (ListGuestBookResponse) {}
+}
