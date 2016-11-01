@@ -57,6 +57,7 @@ func (svc *GuestBookService) List(ctx context.Context, _ *empty.Empty) (*grpcdem
 	}, nil
 }
 
+//NewGuestBookService creates a GuestBookService instance with some example entries
 func NewGuestBookService() *GuestBookService {
 	now, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
