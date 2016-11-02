@@ -14,13 +14,18 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Client struct {
-	service proto.GuestBookServiceClient
-}
+type (
+	// Client wraps proto.GuestBookServiceClient
+	Client struct {
+		service proto.GuestBookServiceClient
+	}
+
+	// Middleware is used to chain grpc.UnaryInvokers in a decorator pattern.
+	Middleware func(grpc.UnaryInvoker) grpc.UnaryInvoker
+)
 
 // NewClient connects to the guestbook service and returns a client
 func NewClient(addr string) (*Client, error) {
-
 	interceptor := grpc.WithUnaryInterceptor(Interceptor)
 
 	block := grpc.WithBlock()
@@ -40,38 +45,61 @@ func NewClient(addr string) (*Client, error) {
 	return &c, err
 }
 
-// Interceptor adds logging and deadline middleware to every request
-func Interceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-	fmt.Printf("Method: [%s]\n", method)
-
-	start := time.Now()
-
-	var err error
-	defer func() {
-		status := "Success"
-		if err != nil {
-			status = "Fail"
+// Chain wraps a variadic set of grpc.UnaryInvoker Middleware
+func Chain(outer Middleware, mws ...Middleware) Middleware {
+	return func(next grpc.UnaryInvoker) grpc.UnaryInvoker {
+		for i := len(mws) - 1; i >= 0; i-- {
+			next = mws[i](next)
 		}
-
-		fmt.Printf("%s: [%s] took=[%s]\n", status, method, time.Since(start))
-
-	}()
-
-	// add a deadline if none is specified
-	_, ok := ctx.Deadline()
-	if !ok {
-		var done func()
-		ctx, done = context.WithTimeout(ctx, time.Second)
-		defer done()
+		return outer(next)
 	}
+}
 
-	err = invoker(ctx, method, req, reply, cc, opts...)
+// Interceptor adds logging and deadline Middleware to every request
+func Interceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	inv := Chain(TimerMiddleware, DeadlineMiddleware)(invoker)
+
+	err := inv(ctx, method, req, reply, cc, opts...)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
 
+// TimerMiddleware adds time & success logging around a grpc.UnaryInvoker
+func TimerMiddleware(next grpc.UnaryInvoker) grpc.UnaryInvoker {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+		var err error
+		defer func(start time.Time) {
+			status := "Success"
+			if err != nil {
+				status = "Fail"
+			}
+
+			fmt.Printf("%s: [%s] took=[%s]\n", status, method, time.Since(start))
+		}(time.Now())
+
+		err = next(ctx, method, req, reply, cc, opts...)
+		return err
+	}
+}
+
+// DeadlineMiddleware wraps method logging and the addtion of a context deadline if one
+// is not present.
+func DeadlineMiddleware(next grpc.UnaryInvoker) grpc.UnaryInvoker {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+		fmt.Printf("Method: [%s]\n", method)
+		// add a deadline if none is specified
+		_, ok := ctx.Deadline()
+		if !ok {
+			var done func()
+			ctx, done = context.WithTimeout(ctx, 1*time.Millisecond)
+			defer done()
+		}
+
+		return next(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 // List retrieves all of the guestbook entries and displays them
